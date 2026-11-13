@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+/* Hardwired CCN Cloud settings (same shape as Laplacian Lab). The key is entered on the page. */
+window.LAPLACIAN_LAB_CONFIG = window.LAPLACIAN_LAB_CONFIG || {
+  MODEL: "claude-sonnet-5-5",
+  WOLFRAM_URL: "https://www.wolframcloud.com/obj/ccn2/CameraKernel"
+};
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snap to Text</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one centred column — viewfinder on top, shutter bar, transcript box below */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --fg:#17202a; --muted:#5d6977; --line:#d3d9e0;
+  --accent:#d6402b; --accent-fg:#ffffff; --frame:#1b232c; --ok:#2f7d4f;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --surface:#1a2129; --fg:#e7ebef; --muted:#97a3b0; --line:#2c3642;
+  --accent:#ef5a43; --accent-fg:#ffffff; --frame:#05080b; --ok:#5cbf86; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --surface:#1a2129; --fg:#e7ebef; --muted:#97a3b0; --line:#2c3642;
+  --accent:#ef5a43; --accent-fg:#ffffff; --frame:#05080b; --ok:#5cbf86; color-scheme:dark}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-weight:600;font-size:1.5rem;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:2px 0 0}
+.viewfinder{position:relative;background:var(--frame);border-radius:14px;aspect-ratio:4/3;max-width:100%;overflow:hidden;
+  display:flex;align-items:center;justify-content:center}
+.viewfinder img,.viewfinder video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.corners::before,.corners::after,.corners span::before,.corners span::after{content:"";position:absolute;width:28px;height:28px;border:2px solid rgba(255,255,255,.55)}
+.corners::before{top:14px;left:14px;border-right:0;border-bottom:0}
+.corners::after{top:14px;right:14px;border-left:0;border-bottom:0}
+.corners span::before{bottom:14px;left:14px;border-right:0;border-top:0}
+.corners span::after{bottom:14px;right:14px;border-left:0;border-top:0}
+.placeholder{color:rgba(255,255,255,.7);text-align:center;padding:24px;font-size:.95rem}
+.placeholder b{display:block;font-family:var(--display);font-weight:500;font-size:1.1rem;color:#fff;margin-bottom:4px}
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.shutter{appearance:none;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:10px;
+  background:var(--accent);color:var(--accent-fg);font:600 1rem var(--display);padding:12px 22px;border-radius:999px}
+.shutter .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--accent-fg);box-shadow:inset 0 0 0 3px var(--accent)}
+.shutter:disabled{opacity:.55;cursor:progress}
+.shutter:focus-visible,.ghost:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ghost{appearance:none;background:transparent;border:1px solid var(--line);color:var(--fg);font:500 .9rem var(--body);padding:9px 14px;border-radius:8px;cursor:pointer}
+.status{color:var(--muted);font-size:.9rem;min-width:0}
+.status.ok{color:var(--ok)} .status.err{color:var(--accent)}
+label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+textarea{width:100%;box-sizing:border-box;height:220px;resize:vertical;overflow-y:scroll;
+  background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  font:400 .9rem/1.6 var(--mono)}
+.field{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+input[type=file]{display:none}
+@media (prefers-reduced-motion:no-preference){.shutter{transition:transform .1s}.shutter:active{transform:scale(.97)}}
+[hidden]{display:none!important}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.keybox{display:flex;flex-direction:column;gap:6px}
+.keyrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.keyrow input{flex:1 1 220px;min-width:0;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:400 .9rem var(--mono)}
+.keyrow input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.pill{font:500 .8rem var(--body);padding:4px 10px;border-radius:999px;background:var(--line);color:var(--muted)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.no{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.pill.warn{background:color-mix(in srgb,#c58a00 18%,transparent);color:#9a6a00}
+.ghost:disabled{opacity:.5;cursor:progress}
+.ghost.wl{border-color:var(--accent);color:var(--accent)}
+.hint{margin:0;font-size:.8rem;color:var(--muted)}
+.wlfig{margin:0;display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.wlfig figcaption{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.wlfig img{background:#fff;border-radius:6px;max-width:100%;height:auto}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Snap to Text</h1>
+    <p class="sub">Take a photo of a page, sign, note or equation. It scans barcodes and QR codes, reads any text, describes what it shows and can run the maths in Wolfram.</p>
+  </header>
+
+  <div class="keybox" id="stt-keybox">
+    <label for="stt-key">WOLFRAM_KEY</label>
+    <div class="keyrow">
+      <input type="password" id="stt-key" placeholder="Your CCN Cloud key" autocomplete="off" spellcheck="false">
+      <span class="pill" id="stt-keystate">Not connected</span>
+    </div>
+  </div>
+
+  <div class="viewfinder corners" id="stt-vf"><span></span>
+    <div class="placeholder" id="stt-ph"><b>No photo yet</b>Press Take photo to use your camera or choose a picture.</div>
+    <video id="stt-video" autoplay playsinline muted hidden></video>
+    <img id="stt-shot" alt="Captured photo" hidden>
+    <canvas id="stt-canvas" hidden></canvas>
+  </div>
+
+  <div class="bar">
+    <button class="shutter" id="stt-snap" type="button"><span class="dot"></span>Take photo</button>
+    <span class="status" id="stt-status" role="status"></span>
+  </div>
+  <input type="file" id="stt-cam" accept="image/*" capture="environment">
+
+  <div class="field">
+    <div class="row">
+      <label for="stt-out">Results</label>
+      <span class="tools">
+        <button class="ghost wl" id="stt-wolfram" type="button" title="Runs the selected text, or the latest WOLFRAM section">CCN Cloud</button>
+        <button class="ghost" id="stt-copy" type="button">Copy</button>
+        <button class="ghost" id="stt-clear" type="button">Clear</button>
+      </span>
+    </div>
+    <textarea id="stt-out" placeholder="Codes, text, a description and Wolfram code for each photo appear here. Each new photo is added to the end."></textarea>
+  </div>
+
+  <figure class="wlfig" id="stt-wlfig" hidden>
+    <figcaption>Wolfram graphics</figcaption>
+    <img id="stt-wlimg" alt="Graphics returned by Wolfram">
+  </figure>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+/* CCN Cloud = LaplacianLabKernel at WOLFRAM_URL. Wolfram code runs there, and photos are
+   read through its chat mode, so no Claude API key is needed in this file.
+   The WOLFRAM_KEY is typed into the page and kept only in this browser. */
+const CFG = window.LAPLACIAN_LAB_CONFIG || {};
+const KERNEL_URL = String(CFG.WOLFRAM_URL || "");
+const HARDWIRED_API_KEY = "";
+
+const STT_MARKUP = "<div class=\"wrap\">\n  <header>\n    <h1>Snap to Text</h1>\n    <p class=\"sub\">Take a photo of a page, sign, note or equation. It scans barcodes and QR codes, reads any text, describes what it shows and can run the maths in Wolfram.</p>\n  </header>\n\n  <div class=\"keybox\" id=\"stt-keybox\">\n    <label for=\"stt-key\">WOLFRAM_KEY</label>\n    <div class=\"keyrow\">\n      <input type=\"password\" id=\"stt-key\" placeholder=\"Your CCN Cloud key\" autocomplete=\"off\" spellcheck=\"false\">\n      <span class=\"pill\" id=\"stt-keystate\">Not connected</span>\n    </div>\n  </div>\n\n  <div class=\"viewfinder corners\" id=\"stt-vf\"><span></span>\n    <div class=\"placeholder\" id=\"stt-ph\"><b>No photo yet</b>Press Take photo to use your camera or choose a picture.</div>\n    <video id=\"stt-video\" autoplay playsinline muted hidden></video>\n    <img id=\"stt-shot\" alt=\"Captured photo\" hidden>\n    <canvas id=\"stt-canvas\" hidden></canvas>\n  </div>\n\n  <div class=\"bar\">\n    <button class=\"shutter\" id=\"stt-snap\" type=\"button\"><span class=\"dot\"></span>Take photo</button>\n    <span class=\"status\" id=\"stt-status\" role=\"status\"></span>\n  </div>\n  <input type=\"file\" id=\"stt-cam\" accept=\"image/*\" capture=\"environment\">\n\n  <div class=\"field\">\n    <div class=\"row\">\n      <label for=\"stt-out\">Results</label>\n      <span class=\"tools\">\n        <button class=\"ghost wl\" id=\"stt-wolfram\" type=\"button\" title=\"Runs the selected text, or the latest WOLFRAM section\">CCN Cloud</button>\n        <button class=\"ghost\" id=\"stt-copy\" type=\"button\">Copy</button>\n        <button class=\"ghost\" id=\"stt-clear\" type=\"button\">Clear</button>\n      </span>\n    </div>\n    <textarea id=\"stt-out\" placeholder=\"Codes, text, a description and Wolfram code for each photo appear here. Each new photo is added to the end.\"></textarea>\n  </div>\n\n  <figure class=\"wlfig\" id=\"stt-wlfig\" hidden>\n    <figcaption>Wolfram graphics</figcaption>\n    <img id=\"stt-wlimg\" alt=\"Graphics returned by Wolfram\">\n  </figure>\n</div>";
+function initSnap(){
+const $ = id => document.getElementById(id);
+if(!$("stt-snap") || !$("stt-cam") || !$("stt-out")){
+  const host = document.createElement("div");
+  host.innerHTML = STT_MARKUP;
+  (document.body || document.documentElement).appendChild(host);
+}
+const snap=$("stt-snap"), cam=$("stt-cam"), shot=$("stt-shot"), ph=$("stt-ph"), out=$("stt-out"), status=$("stt-status");
+const video=$("stt-video"), canvas=$("stt-canvas"), wlBtn=$("stt-wolfram"), wlFig=$("stt-wlfig"), wlImg=$("stt-wlimg");
+const MODEL=String(CFG.MODEL||"claude-sonnet-5-5");
+let sample=null, mcp=null, busy=false, stream=null;
+const keyIn=$("stt-key"), keyState=$("stt-keystate"), keyBox=$("stt-keybox");
+let kernelOk=false;
+const wolframKey = () => (keyIn ? keyIn.value.trim() : "");
+const kernelOn = () => !!(KERNEL_URL.trim() && wolframKey());
+const apiKey = () => HARDWIRED_API_KEY.trim();
+function setStatus(t, cls){ status.textContent=t; status.className="status"+(cls?" "+cls:""); }
+function append(block){ out.value = (out.value.trim() ? out.value.replace(/\s*$/,"") + "\n\n" : "") + block.replace(/\s*$/,"") + "\n"; out.scrollTop = out.scrollHeight; }
+
+// ---------- UTF-8 safe base64 (the kernel needs this for Δ, ∇, θ ...) ----------
+function b64enc(str){ const bytes=new TextEncoder().encode(str); let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000)); return btoa(bin); }
+function b64dec(b){ return new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))); }
+
+// ---------- LaplacianLabKernel ----------
+async function kernelCall(params){
+  const body=new URLSearchParams({key:wolframKey(), ...params});
+  let r;
+  try{ r=await fetch(KERNEL_URL.trim(),{method:"POST",body}); }
+  catch(e){ throw new Error("Couldn't reach LaplacianLabKernel. Check WOLFRAM_URL and your connection."); }
+  const j=await r.json().catch(()=>null);
+  if(!j) throw new Error("LaplacianLabKernel sent an unreadable reply (HTTP "+r.status+").");
+  if(j.Success===false || j.Failure || j.Message==="bad key") throw new Error(j.Message==="bad key"||/forbidden/i.test(String(j.Failure||"")) ? "LaplacianLabKernel refused the secret. Check your WOLFRAM_KEY." : (j.Message||"LaplacianLabKernel reported an error."));
+  return j;
+}
+
+// ---------- Prompt ----------
+const PROMPT = "This is a photo taken with a camera. Reply in exactly this format, with these three headings and nothing before or after:\n\n"
+ + "TEXT:\n<every piece of text visible in the photo, transcribed exactly as written, keeping the original line breaks and reading order. If there is no readable text, write: [No text found]>\n\n"
+ + "DESCRIPTION:\n<a clear description of what the photo shows: the main subject, objects, people (without guessing who they are), setting, colours and any notable details. 2 to 5 sentences.>\n\n"
+ + "WOLFRAM:\n<if the photo contains mathematics, equations or Wolfram Language code, write it as runnable Wolfram Language code, one input per line, no comments and no code fences. "
+ + "Use x, y, z as variables. For the Laplacian you may write Δ[n]@expr or Laplacian[expr, {x, y, z}]. If there is nothing to compute, write: [None]>";
+
+// ---------- Reading the photo with Claude ----------
+function toJpegBase64(blob, maxSide, q){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,maxSide/Math.max(img.width,img.height));
+      const c=document.createElement("canvas"); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL("image/jpeg",q).split(",")[1]);
+    };
+    img.onerror=()=>rej(new Error("Couldn't open that image."));
+    img.src=URL.createObjectURL(blob);
+  });
+}
+async function readWithKernel(file){
+  const data=await toJpegBase64(file,1200,0.85);
+  const payload={model:MODEL,max_tokens:4096,messages:[{role:"user",content:[
+    {type:"image",source:{type:"base64",media_type:"image/jpeg",data}},{type:"text",text:PROMPT}]}]};
+  const j=await kernelCall({mode:"chat",payload_b64:b64enc(JSON.stringify(payload))});
+  if(j.error) throw new Error(j.error==="no chat key stored" ? "LaplacianLabKernel has no Claude key stored. Run Step 1 (CloudPut) in Wolfram." : "Kernel chat failed: "+j.error);
+  return b64dec(j.text_b64||"").trim();
+}
+async function readWithApi(file){
+  const data=await toJpegBase64(file,1568,0.9);
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":apiKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:MODEL,max_tokens:4096,messages:[{role:"user",content:[
+      {type:"image",source:{type:"base64",media_type:"image/jpeg",data}},{type:"text",text:PROMPT}]}]})
+  });
+  const j=await r.json().catch(()=>null);
+  if(!r.ok){
+    if(r.status===401) throw new Error("The API key was rejected. Check it and try again.");
+    if(r.status===429) throw new Error("Rate limit reached. Wait a moment, then try again.");
+    throw new Error(j?.error?.message||("HTTP "+r.status));
+  }
+  return (j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+}
+const sampleMessages = {
+  not_granted:"Claude wasn't allowed to read photos on this page.",
+  images_unavailable:"This view can't send photos to Claude.",
+  image_rejected:"That photo couldn't be read. Try another shot.",
+  rate_limited:"Too many requests right now. Wait a moment, then try again.",
+  refused:"Claude declined to read this photo.",
+  session_expired:"Sign in to Claude again, then retry.",
+  empty_completion:"No text came back. Try a clearer photo.",
+};
+
+// ---------- Wolfram: Δ notation prelude (from Laplacian Lab) ----------
+const PRELUDE = String.raw`\[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS] = {x, y, z};
+\[ScriptD] := Length[\[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS]];
+\[ScriptCapitalC]enter := Symbol[ToString[#] <> "0"] & /@ \[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS];
+\[ScriptCapitalH]elp := {"\[ScriptD]" -> \[ScriptD], "\[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS]" -> \[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS], "\[ScriptCapitalC]enter" -> \[ScriptCapitalC]enter, "\[CapitalDelta]" -> "\[CapitalDelta][n][expr]", "\|01d71f" -> "\|01d71f\[CircleTimes]expr"};
+lapToExpr[g_Symbol] := If[OwnValues[g] === {} && DownValues[g] === {}, g @@ \[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS], g];
+lapToExpr[g_] := g;
+lapN[g_, n_Integer?NonNegative] := Nest[Laplacian[#, \[ScriptA]\[ScriptR]\[ScriptG]\[ScriptS]] &, lapToExpr[g], n];
+\[CapitalDelta][n_Integer?NonNegative][g_] := lapN[g, n];
+\[CapitalDelta][g_] /; ! IntegerQ[g] := lapN[g, 1];
+\|01d71f = lapOp;
+Unprotect[CircleTimes]; CircleTimes[ops : lapOp .., g_] := lapN[g, Length[{ops}]]; Protect[CircleTimes];
+`;
+const SUP={"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9"};
+function rewriteDelta(s){
+  return s
+    .replace(/∇\s*(?:²|\^\s*2)/g,"Δ")
+    .replace(/Δ\s*\^\s*(\d+)/g,"Δ[$1]@")
+    .replace(/Δ\s*\(\s*(\d+)\s*\)/g,"Δ[$1]@")
+    .replace(/Δ([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g,(m,d)=>"Δ["+[...d].map(c=>SUP[c]).join("")+"]@")
+    .replace(/Δ(\d+)(?=\s*[A-Za-z(])/g,"Δ[$1]@")
+    .replace(/Δ(?=\s*[A-Za-z(])/g,"Δ[1]@");
+}
+function tidyOutput(t){
+  return t.split("\n")
+    .filter(l=>!/Symbol::undefined2/.test(l) && !/^General::messages/.test(l.trim()))
+    .join("\n")
+    .replace(/Out\[\d+\]=\s*/g,"")
+    .replace(/Derivative\[([\d,\s]+)\]\[(\w+)\]/g,(m,k,f)=>f+"^("+k.replace(/\s/g,"")+")")
+    .trim();
+}
+function latestWolframSection(){
+  const i=out.value.lastIndexOf("WOLFRAM:\n");
+  if(i<0) return "";
+  let s=out.value.slice(i+9);
+  const stop=s.search(/\n(?:WOLFRAM RESULT:|CODES:|TEXT:|DESCRIPTION:|─{4,})/);
+  if(stop>=0) s=s.slice(0,stop);
+  s=s.trim();
+  return /^\[None\]$/i.test(s) ? "" : s;
+}
+const mcpMessages = {
+  server_not_connected:"Add the Wolfram connector in claude.ai Settings → Connectors, then try again.",
+  needs_reauth:"Reconnect Wolfram in claude.ai Settings → Connectors.",
+  not_in_manifest:"Wolfram isn't allowed for this page. Turn it on in the page's Permissions.",
+  blocked_by_policy:"Your organisation blocks the Wolfram connector here.",
+  approval_required:"Running Wolfram code needs your approval. Press CCN Cloud again and allow it.",
+  selection_required:"Choose which Wolfram connector to use when Claude asks, then try again.",
+  server_unavailable:"Wolfram didn't answer. Try again in a moment.",
+};
+async function runWolfram(){
+  if(busy) return;
+  const sel = out.value.slice(out.selectionStart, out.selectionEnd).trim();
+  const src = sel || latestWolframSection();
+  if(!src){ setStatus("Select some Wolfram code in the results, or take a photo of an equation first.","err"); return; }
+  const code = PRELUDE + rewriteDelta(src);
+  busy=true; wlBtn.disabled=true; snap.disabled=true;
+  try{
+    let text="", image="", imageType="image/png";
+    if(mcp){
+      setStatus("Running on CCN Cloud…");
+      const r = await mcp.callTool("Wolfram","WolframLanguageEvaluator",{code, timeConstraint:60},{cache:false});
+      for(const b of (r.content||[])){
+        if(b.type==="text") text += (text?"\n":"") + b.text;
+        else if(b.type==="image" && !image){ image=b.data; imageType=b.mimeType||imageType; }
+      }
+    } else if(kernelOn()){
+      setStatus("Running on CCN Cloud…");
+      const j = await kernelCall({mode:"wolfram", code_b64:b64enc(code)});
+      text = j.text_b64 ? b64dec(j.text_b64) : (j.text||"");
+      image = j.image||"";
+    } else {
+      setStatus("Enter your WOLFRAM_KEY above to use CCN Cloud.","err");
+      return;
+    }
+    text = tidyOutput(text) || (image ? "-Graphics- (shown below)" : "[No output]");
+    append("WOLFRAM RESULT:\n"+text);
+    if(image){ wlImg.src="data:"+imageType+";base64,"+image; wlFig.hidden=false; } else wlFig.hidden=true;
+    setStatus("Wolfram finished.","ok");
+  }catch(e){
+    if(e && e.code){
+      const msg = mcpMessages[e.code] || (e.code==="tool_error" ? "Wolfram reported an error: "+(e.message||"") : "Couldn't run the code in Wolfram. Try again.");
+      setStatus(msg,"err");
+    } else setStatus(e?.message||"Couldn't run the code in Wolfram.","err");
+  }finally{ busy=false; wlBtn.disabled=false; snap.disabled=false; }
+}
+wlBtn.onclick = runWolfram;
+
+// ---------- Hardwired CCN Cloud check: runs when a key is entered ----------
+const CHECK_CODE = "{$VersionNumber, 1 + 1, " + "\\[CapitalDelta][1][x^2 + y^2 + z^2]}"; // expects {version, 2, 6}
+function setKeyState(t, cls){ if(!keyState) return; keyState.textContent=t; keyState.className="pill"+(cls?" "+cls:""); }
+async function checkKernel(){
+  kernelOk=false;
+  if(!wolframKey()){ setKeyState("Not connected"); return; }
+  setKeyState("Checking…");
+  try{
+    const j = await kernelCall({mode:"wolfram", code_b64:b64enc(PRELUDE + CHECK_CODE)});
+    const t = j.text_b64 ? b64dec(j.text_b64) : (j.text||"");
+    const m = t.match(/\{\s*([\d.]+)\s*,\s*2\s*,\s*6\s*\}/);
+    if(!m){ setKeyState("Kernel answered oddly","no"); setStatus("CCN Cloud replied, but the test gave: "+t.slice(0,120),"err"); return; }
+    kernelOk=true;
+    setKeyState("Connected · Wolfram "+m[1].replace(/\.$/,"")+(j.chat_ready===false?" · no Claude key on kernel":""), j.chat_ready===false?"warn":"ok");
+    setStatus(j.chat_ready===false ? "CCN Cloud works, but no Claude key is stored on the kernel, so photos can't be read yet." : "CCN Cloud is connected.", j.chat_ready===false?"err":"ok");
+  }catch(e){ setKeyState("Not connected","no"); setStatus(e.message||"Couldn't reach CCN Cloud.","err"); }
+}
+if(keyIn){
+  try{ const k=localStorage.getItem("ccn-wolfram-key"); if(k) keyIn.value=k; }catch(e){}
+  keyIn.addEventListener("change", ()=>{
+    try{ if(wolframKey()) localStorage.setItem("ccn-wolfram-key", wolframKey()); else localStorage.removeItem("ccn-wolfram-key"); }catch(e){}
+    checkKernel();
+  });
+  keyIn.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); keyIn.blur(); } });
+}
+
+// ---------- Capabilities inside Claude ----------
+(async()=>{
+  try{ sample = await window.claude?.use("sample"); }catch(e){ sample=null; }
+  try{ mcp = await window.claude?.use("mcp"); }catch(e){ mcp=null; }
+  if(window.claude && keyBox) keyBox.hidden = true;          // inside Claude the Wolfram connector is used instead
+  if(!window.claude){
+    if(wolframKey()) checkKernel();
+    else if(!apiKey()) setStatus("Enter your WOLFRAM_KEY above so photos can be read.","err");
+  }
+})();
+
+// ---------- Camera ----------
+async function startCamera(){
+  if(!navigator.mediaDevices?.getUserMedia) return;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}},audio:false});
+    video.srcObject=stream; video.hidden=false; ph.hidden=true; shot.hidden=true;
+  }catch(e){
+    stream=null;
+    if(e && e.name==="NotAllowedError" && !window.claude)
+      ph.innerHTML="<b>Camera blocked</b>Allow camera access in your browser's address bar and reload, or press Take photo to choose a picture.";
+  }
+}
+function showLive(){ if(stream){ shot.hidden=true; video.hidden=false; } }
+startCamera();
+
+snap.onclick = () => {
+  if(busy) return;
+  if(stream && video.videoWidth){
+    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+    canvas.getContext("2d").drawImage(video,0,0);
+    canvas.toBlob(b=>{ if(b) processPhoto(b); },"image/jpeg",0.92);
+  } else cam.click();
+};
+cam.onchange = () => { const f = cam.files && cam.files[0]; cam.value=""; if(f) processPhoto(f); };
+
+// ---------- Barcode & QR code reading (runs in the browser, no API needed) ----------
+const FORMAT_NAMES={qr_code:"QR code",ean_13:"EAN-13",ean_8:"EAN-8",upc_a:"UPC-A",upc_e:"UPC-E",code_128:"Code 128",code_39:"Code 39",code_93:"Code 93",
+  codabar:"Codabar",itf:"ITF",data_matrix:"Data Matrix",aztec:"Aztec",pdf417:"PDF417",
+  QR_CODE:"QR code",EAN_13:"EAN-13",EAN_8:"EAN-8",UPC_A:"UPC-A",UPC_E:"UPC-E",CODE_128:"Code 128",CODE_39:"Code 39",CODE_93:"Code 93",
+  CODABAR:"Codabar",ITF:"ITF",DATA_MATRIX:"Data Matrix",AZTEC:"Aztec",PDF_417:"PDF417",RSS_14:"GS1 DataBar",RSS_EXPANDED:"GS1 DataBar Expanded",MAXICODE:"MaxiCode"};
+async function imageToCanvas(blob, maxSide){
+  const bmp = await createImageBitmap(blob);
+  const scale = Math.min(1, maxSide/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas"); c.width=Math.round(bmp.width*scale); c.height=Math.round(bmp.height*scale);
+  c.getContext("2d",{willReadFrequently:true}).drawImage(bmp,0,0,c.width,c.height); bmp.close?.();
+  return c;
+}
+function zxingDecode(c){
+  if(!window.ZXing) return [];
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  const {data}=ctx.getImageData(0,0,c.width,c.height);
+  const lum=new Uint8ClampedArray(c.width*c.height);
+  for(let i=0,j=0;j<lum.length;i+=4,j++) lum[j]=(data[i]*299+data[i+1]*587+data[i+2]*114)/1000;
+  const hints=new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+  const reader=new ZXing.MultiFormatReader(); reader.setHints(hints);
+  const tryOne = l => { try{
+      const r=reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.RGBLuminanceSource(l,c.width,c.height))));
+      return [{format:ZXing.BarcodeFormat[r.getBarcodeFormat()], value:r.getText()}];
+    }catch(e){ return []; } };
+  let res=tryOne(lum);
+  if(!res.length){ const inv=lum.map(v=>255-v); res=tryOne(inv); }
+  return res;
+}
+async function readCodes(blob){
+  try{
+    const c = await imageToCanvas(blob, 1600);
+    if("BarcodeDetector" in window){
+      try{
+        const formats = await BarcodeDetector.getSupportedFormats();
+        if(formats.length){
+          const found = await new BarcodeDetector({formats}).detect(c);
+          if(found.length) return found.map(f=>({format:f.format, value:f.rawValue}));
+        }
+      }catch(e){}
+    }
+    return zxingDecode(c);
+  }catch(e){ return []; }
+}
+function codesBlock(codes){
+  const seen=new Set(), lines=[];
+  for(const k of codes){ const key=k.format+"|"+k.value; if(seen.has(key)) continue; seen.add(key);
+    lines.push((FORMAT_NAMES[k.format]||k.format)+": "+k.value); }
+  return "CODES:\n"+(lines.length?lines.join("\n"):"[No barcodes or QR codes found]");
+}
+
+// ---------- One photo: codes, then text + description + Wolfram code ----------
+async function processPhoto(file){
+  shot.src = URL.createObjectURL(file); shot.hidden=false; video.hidden=true; ph.hidden=true;
+  busy=true; snap.disabled=true; wlBtn.disabled=true; setStatus("Scanning for barcodes and QR codes…");
+  const pre = out.value.trim() ? out.value.replace(/\s*$/,"") + "\n\n────────────\n\n" : "";
+  const head = pre + codesBlock(await readCodes(file)) + "\n\n";
+  out.value = head; out.scrollTop = out.scrollHeight;
+  try{
+    setStatus("Reading text and describing the photo…");
+    if(sample){
+      const { text } = await sample(PROMPT, { images:[file], cache:false,
+        onText:({text})=>{ out.value = head + text; out.scrollTop = out.scrollHeight; } });
+      out.value = head + text.trim() + "\n";
+    } else if(kernelOn()){
+      out.value = head + (await readWithKernel(file)) + "\n";
+    } else if(apiKey()){
+      out.value = head + (await readWithApi(file)) + "\n";
+    } else {
+      out.value = head.replace(/\s*$/,"\n");
+      setStatus("Codes scanned. Enter your WOLFRAM_KEY above to read text too.","err");
+      return;
+    }
+    out.scrollTop = out.scrollHeight;
+    setStatus(latestWolframSection() ? "Done. Press CCN Cloud to compute the WOLFRAM section." : "Done. Results added below.","ok");
+  }catch(e){
+    out.value = head + (e && e.text ? e.text : "");
+    setStatus(sampleMessages[e?.code] || e?.message || "Something went wrong reading the photo. Try again.","err");
+  }finally{ busy=false; snap.disabled=false; wlBtn.disabled=false; setTimeout(showLive,2500); }
+}
+
+$("stt-clear").onclick = () => { out.value=""; wlFig.hidden=true; setStatus(""); };
+$("stt-copy").onclick = async () => {
+  try{ await navigator.clipboard.writeText(out.value); setStatus("Copied.","ok"); }
+  catch{ out.focus(); out.select(); setStatus("Press Ctrl/⌘+C to copy the selected text."); }
+};
+}
+if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initSnap);
+else initSnap();
+</script>
+
+</body>
+</html>
