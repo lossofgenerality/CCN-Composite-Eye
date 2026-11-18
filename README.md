@@ -12,6 +12,8 @@ Photos are read by Claude through **CCN Cloud** (`CameraKernel` on Wolfram Cloud
 
 **Authors:** Dara O Shayda and Noor Hoshino (星野ヌール)
 
+**Site:** [justice.compclassnotes.com](https://justice.compclassnotes.com/)
+
 ## Use
 
 1. Open `index.html` in a browser (Chrome, Edge, Safari or Firefox) and allow the camera.
@@ -45,6 +47,6 @@ The kernel has two modes: `wolfram` evaluates code (`code_b64`, UTF-8 base64) an
 
 ---
 
-© Computational Classnotes · CC BY-NC-SA 4.0
+[© Computational Classnotes · CC BY-NC-SA 4.0](https://justice.compclassnotes.com/)
 
 https://justice.compclassnotes.com/
