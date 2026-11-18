@@ -1,3 +1,4 @@
+<!-- © Computational Classnotes · CC BY-NC-SA 4.0 -->
 # CCN Composite Eye
 
 A camera page that turns a photo into text. Point it at a page, sign, note, barcode or equation and press **Take photo**. For each photo it adds:
@@ -8,6 +9,8 @@ A camera page that turns a photo into text. Point it at a page, sign, note, barc
 - **WOLFRAM** – any maths in the photo, written as Wolfram Language code
 
 Photos are read by Claude through **CCN Cloud** (`CameraKernel` on Wolfram Cloud), so no Claude API key is kept in the page.
+
+**Authors:** Dara O Shayda and Noor Hoshino (星野ヌール)
 
 ## Use
 
@@ -43,3 +46,5 @@ The kernel has two modes: `wolfram` evaluates code (`code_b64`, UTF-8 base64) an
 ---
 
 © Computational Classnotes · CC BY-NC-SA 4.0
+
+https://justice.compclassnotes.com/

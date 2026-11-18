@@ -3,7 +3,8 @@
    Same design as LaplacianLabKernel: "wolfram" mode evaluates code, "chat" mode
    forwards a Claude Messages request using a key kept in a private Cloud object.
    Run from a signed-in Mathematica or Wolfram Cloud notebook.
-   (c) Computational Classnotes · CC BY-NC-SA 4.0 *)
+   By Dara O Shayda and Noor Hoshino (星野ヌール)
+   © Computational Classnotes · CC BY-NC-SA 4.0 *)
 
 (* Step 1, once: store the Claude API key privately *)
 CloudPut["PASTE-THE-CLAUDE-API-KEY-HERE", "CameraKernel/apikey", Permissions -> "Private"]
@@ -58,3 +59,5 @@ With[{keyObj = CloudObject["CameraKernel/apikey"], secret = "CHOOSE-A-LONG-SECRE
 
 (* Connection check the page runs (expects {version, 2, 6}):
    {$VersionNumber, 1 + 1, \[CapitalDelta][1][x^2 + y^2 + z^2]}  -- sent after the Δ prelude *)
+
+(* © Computational Classnotes · CC BY-NC-SA 4.0 *)
