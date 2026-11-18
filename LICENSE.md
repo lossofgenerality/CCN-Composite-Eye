@@ -12,5 +12,3 @@ This work (the page, the Wolfram kernel script and documentation) is licensed un
 
 Full licence text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 Summary: https://creativecommons.org/licenses/by-nc-sa/4.0/
-
-https://justice.compclassnotes.com/
