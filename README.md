@@ -40,10 +40,6 @@ window.LAPLACIAN_LAB_CONFIG = window.LAPLACIAN_LAB_CONFIG || {
 
 The kernel has two modes: `wolfram` evaluates code (`code_b64`, UTF-8 base64) and `chat` forwards a Claude Messages request (`payload_b64`). Requests without the right `key` are refused.
 
-## Production team
-
-Principal Investigator Lucval · Oversight Directorate Zil · Editors Dara, Lucia, Zil · Software FreeFormer · Agent Kirari-chan (キラリちゃん)
-
 ---
 
 © Computational Classnotes · CC BY-NC-SA 4.0
