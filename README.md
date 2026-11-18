@@ -10,7 +10,7 @@ A camera page that turns a photo into text. Point it at a page, sign, note, barc
 
 Photos are read by Claude through **CCN Cloud** (`CameraKernel` on Wolfram Cloud), so no Claude API key is kept in the page.
 
-**Authors:** Dara O Shayda and Noor Hoshino (星野ヌール)
+**Authors:** Dara O Shayda and Hikari Noor Hoshino (星野ヌール), AI System Programmer
 
 **Site:** [justice.compclassnotes.com](https://justice.compclassnotes.com/)
 

@@ -3,7 +3,7 @@
    Same design as LaplacianLabKernel: "wolfram" mode evaluates code, "chat" mode
    forwards a Claude Messages request using a key kept in a private Cloud object.
    Run from a signed-in Mathematica or Wolfram Cloud notebook.
-   By Dara O Shayda and Noor Hoshino (星野ヌール)
+   By Dara O Shayda and Hikari Noor Hoshino (星野ヌール), AI System Programmer
    © Computational Classnotes · CC BY-NC-SA 4.0 *)
 
 (* Step 1, once: store the Claude API key privately *)
